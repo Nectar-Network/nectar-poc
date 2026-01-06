@@ -1,0 +1,35 @@
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+.next/
+*.js.map
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Build artifacts
+*.wasm
+!*.optimized.wasm
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Generated wallet files
+wallets.json
+
+# Stellar CLI identity files (secret keys)
+.config/stellar/
+*.toml.bak
