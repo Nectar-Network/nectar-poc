@@ -1,0 +1,91 @@
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: hsl(220, 15%, 6%);
+  --surface: hsl(220, 12%, 10%);
+  --surface-2: hsl(220, 10%, 14%);
+  --accent: hsl(160, 90%, 52%);
+  --amber: hsl(38, 95%, 55%);
+  --red: hsl(0, 85%, 60%);
+  --text: hsl(220, 20%, 75%);
+  --text-dim: hsl(220, 10%, 45%);
+  --border: hsl(220, 15%, 16%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Mono", monospace;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Dot grid background utility */
+.dot-grid {
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Noise overlay */
+.noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Staggered animation utilities */
+.stagger-1 { animation: fadeUp 0.6s ease-out 0.05s both; }
+.stagger-2 { animation: fadeUp 0.6s ease-out 0.15s both; }
+.stagger-3 { animation: fadeUp 0.6s ease-out 0.25s both; }
+.stagger-4 { animation: fadeUp 0.6s ease-out 0.35s both; }
+.stagger-5 { animation: fadeUp 0.6s ease-out 0.45s both; }
+.stagger-6 { animation: fadeUp 0.6s ease-out 0.55s both; }
+.stagger-7 { animation: fadeUp 0.6s ease-out 0.65s both; }
+
+@keyframes fadeUp {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse2 {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes stream {
+  0% { opacity: 0; transform: translateX(-6px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* Active status dot */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse2 2s ease-in-out infinite;
+  display: inline-block;
+}
+
+.status-dot.amber {
+  background: var(--amber);
+}
+
+.status-dot.red {
+  background: var(--red);
+}
