@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  keeper-alpha:
+    build:
+      context: ./keeper
+    env_file: .env
+    environment:
+      KEEPER_NAME: keeper-alpha
+      KEEPER_SECRET: "${KEEPER_A_SECRET}"
+      API_PORT: "8080"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  keeper-beta:
+    build:
+      context: ./keeper
+    env_file: .env
+    environment:
+      KEEPER_NAME: keeper-beta
+      KEEPER_SECRET: "${KEEPER_B_SECRET}"
+      API_PORT: "8081"
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      NEXT_PUBLIC_REGISTRY_CONTRACT: "${REGISTRY_CONTRACT:-}"
+    ports:
+      - "3000:3000"
+    depends_on:
+      keeper-alpha:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
