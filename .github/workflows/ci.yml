@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contracts:
+    name: Rust Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Test keeper-registry
+        run: cargo test -p keeper-registry
+
+      - name: Test nectar-vault
+        run: cargo test -p nectar-vault
+
+      - name: Test mock-token
+        run: cargo test -p mock-token
+
+      - name: Build contracts (release + wasm32)
+        run: cargo build --target wasm32-unknown-unknown --release
+
+  keeper:
+    name: Go Keeper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: keeper/go.sum
+
+      - name: Download modules
+        working-directory: keeper
+        run: go mod download
+
+      - name: Build
+        working-directory: keeper
+        run: go build ./...
+
+      - name: Test (with race detector)
+        working-directory: keeper
+        run: go test -race -count=1 -timeout 60s ./...
+
+  frontend:
+    name: Next.js Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:8080"
