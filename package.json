@@ -1,0 +1,15 @@
+{
+  "name": "nectar-network",
+  "private": true,
+  "scripts": {
+    "keeper": "npm start --prefix keeper",
+    "keeper:alpha": "KEEPER_NAME=keeper-alpha npm start --prefix keeper",
+    "keeper:beta": "KEEPER_NAME=keeper-beta npm start --prefix keeper",
+    "frontend": "npm run dev --prefix frontend",
+    "typecheck": "npm run --prefix keeper tsc --noEmit",
+    "test:contract": "cargo test",
+    "deploy": "./scripts/deploy.sh",
+    "register": "./scripts/register-keepers.sh",
+    "trigger": "npx tsx scripts/trigger-liquidation.ts"
+  }
+}
