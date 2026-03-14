@@ -72,7 +72,7 @@ func LoadConfig() Config {
 }
 
 func mustEnv(key string) string {
-	v := os.Getenv(key)
+	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
 		fmt.Fprintf(os.Stderr, "missing required env: %s\n", key)
 		os.Exit(1)
@@ -81,7 +81,7 @@ func mustEnv(key string) string {
 }
 
 func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
 	}
 	return fallback

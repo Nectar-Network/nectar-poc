@@ -137,9 +137,10 @@ func main() {
 	_ = godotenv.Load()
 	cfg := LoadConfig()
 
+	logInfo("parsing keypair", "key_len", len(cfg.SecretKey), "prefix", cfg.SecretKey[:1])
 	kp, err := keypair.ParseFull(cfg.SecretKey)
 	if err != nil {
-		logErr("parse keypair", "err", err)
+		logErr("parse keypair", "err", err, "key_len", len(cfg.SecretKey))
 		return
 	}
 
