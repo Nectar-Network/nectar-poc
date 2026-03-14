@@ -90,4 +90,4 @@ cargo test
 
 ## Status
 
-Testnet prototype. Built for SCF #42 submission by 29projects Lab.
+Testnet prototype. Built by 29projects Lab.

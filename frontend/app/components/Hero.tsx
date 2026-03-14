@@ -98,8 +98,7 @@ export default function Hero() {
             style={{ color: "var(--text-dim)", fontFamily: "DM Mono, monospace" }}
           >
             Multi-operator liquidation network for Blend Protocol. Distributed
-            across competing keepers. No single point of failure. Built for
-            SCF #42.
+            across competing keepers. No single point of failure.
           </p>
 
           <div className="stagger-4 flex flex-wrap gap-3">
