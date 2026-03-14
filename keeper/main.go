@@ -147,10 +147,10 @@ func main() {
 
 	logInfo("registering keeper", "name", cfg.KeeperName)
 	if err := registry.Register(rpc, cfg.HorizonURL, kp, cfg.Passphrase, cfg.RegistryID, cfg.KeeperName); err != nil {
-		logErr("registration failed", "err", err)
-		return
+		logWarn("registration skipped (may already be registered)", "err", err)
+	} else {
+		logInfo("registered", "name", cfg.KeeperName)
 	}
-	logInfo("registered", "name", cfg.KeeperName)
 
 	state.mu.Lock()
 	state.Keepers = append(state.Keepers, keeperRow{
@@ -190,43 +190,48 @@ func main() {
 }
 
 func cycle(rpc *soroban.Client, kp *keypair.Full, cfg Config) error {
-	pool, err := blend.LoadPool(rpc, cfg.Passphrase, cfg.BlendPool)
-	if err != nil {
-		return fmt.Errorf("load pool: %w", err)
-	}
-
-	ledger, err := rpc.LatestLedger()
-	if err != nil {
-		return fmt.Errorf("latest ledger: %w", err)
-	}
-
-	positions, err := blend.GetPositions(rpc, cfg.Passphrase, cfg.BlendPool, ledger-1000)
-	if err != nil {
-		return fmt.Errorf("get positions: %w", err)
-	}
-
-	var rows []posRow
-	for i := range positions {
-		pos := &positions[i]
-		pos.HF = blend.CalcHealthFactor(*pos, pool)
-		rows = append(rows, posRow{Address: pos.Address, HF: pos.HF})
-
-		if pos.HF >= 1.0 {
-			continue
+	// When BlendPool is configured, monitor positions and execute liquidations
+	if cfg.BlendPool != "" {
+		pool, err := blend.LoadPool(rpc, cfg.Passphrase, cfg.BlendPool)
+		if err != nil {
+			return fmt.Errorf("load pool: %w", err)
 		}
 
-		logInfo("underwater position", "user", short(pos.Address), "hf", fmt.Sprintf("%.4f", pos.HF))
-		state.addEvent(fmt.Sprintf("underwater: %s hf=%.4f", short(pos.Address), pos.HF))
-
-		if err := handleLiquidation(rpc, kp, cfg, pool, pos.Address, ledger); err != nil {
-			logWarn("liquidation failed", "user", short(pos.Address), "err", err)
-			state.addEvent(fmt.Sprintf("liq failed: %s %v", short(pos.Address), err))
+		ledger, err := rpc.LatestLedger()
+		if err != nil {
+			return fmt.Errorf("latest ledger: %w", err)
 		}
-	}
 
-	state.mu.Lock()
-	state.Positions = rows
-	state.mu.Unlock()
+		positions, err := blend.GetPositions(rpc, cfg.Passphrase, cfg.BlendPool, ledger-1000)
+		if err != nil {
+			return fmt.Errorf("get positions: %w", err)
+		}
+
+		var rows []posRow
+		for i := range positions {
+			pos := &positions[i]
+			pos.HF = blend.CalcHealthFactor(*pos, pool)
+			rows = append(rows, posRow{Address: pos.Address, HF: pos.HF})
+
+			if pos.HF >= 1.0 {
+				continue
+			}
+
+			logInfo("underwater position", "user", short(pos.Address), "hf", fmt.Sprintf("%.4f", pos.HF))
+			state.addEvent(fmt.Sprintf("underwater: %s hf=%.4f", short(pos.Address), pos.HF))
+
+			if err := handleLiquidation(rpc, kp, cfg, pool, pos.Address, ledger); err != nil {
+				logWarn("liquidation failed", "user", short(pos.Address), "err", err)
+				state.addEvent(fmt.Sprintf("liq failed: %s %v", short(pos.Address), err))
+			}
+		}
+
+		state.mu.Lock()
+		state.Positions = rows
+		state.mu.Unlock()
+	} else {
+		state.addEvent("vault monitor mode — no Blend pool configured")
+	}
 
 	// refresh vault state
 	if vs, err := vault.GetState(rpc, cfg.Passphrase, cfg.VaultID); err == nil {

@@ -31,7 +31,7 @@ func LoadConfig() Config {
 		KeeperName: envOr("KEEPER_NAME", "nectar-keeper-1"),
 		RegistryID: mustEnv("REGISTRY_CONTRACT"),
 		VaultID:    mustEnv("VAULT_CONTRACT"),
-		BlendPool:  mustEnv("BLEND_POOL"),
+		BlendPool:  envOr("BLEND_POOL", ""),
 		APIPort:    envOr("API_PORT", "8080"),
 	}
 
