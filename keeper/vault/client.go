@@ -11,10 +11,10 @@ import (
 )
 
 type VaultState struct {
-	TotalUSDC   int64
-	TotalShares int64
-	TotalProfit int64
-	ActiveLiq   int64
+	TotalUSDC   int64 `json:"total_usdc"`
+	TotalShares int64 `json:"total_shares"`
+	TotalProfit int64 `json:"total_profit"`
+	ActiveLiq   int64 `json:"active_liq"`
 }
 
 type BalanceResult struct {
