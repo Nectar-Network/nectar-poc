@@ -29,11 +29,14 @@ const TESTNET_DEPOSITORS = [
   { address: "GAWCQESM3DOV6MZAJYXSBCQLJO2HJ72Y3UYQEFL3KURKQBJ4HHZAF76M", shares: 67100000000, usdc_value: 67100000000, pnl_pct: 0 },
   { address: "GDUD7QDYIM2H3GBKCJW7PD7PRFYSXOJLWWCZQW5JJMSBI4MCWLRWEMUX", shares: 3750000000,  usdc_value: 3750000000,  pnl_pct: 0 },
   { address: "GCUBGYBXCNREDUN6ZMO2EADUHZSNF76ULMOWEI5CQVNJ6MHCZ5EVYIT2", shares: 10100000000, usdc_value: 10100000000, pnl_pct: 0 },
+  { address: "GASHYWLGY3XD4HSJWVV3COJKLT6WHQINC2J2FXO7C6AXQVWPW25RETUY", shares: 127870009000, usdc_value: 127870009000, pnl_pct: 0 },
+  { address: "GDJEBRSBIE3BAXAMTK2XKSKMTOYD45PSRC4F5FEJAYM4EL6Y4WO23CGS", shares: 50000, usdc_value: 50000, pnl_pct: 0 },
+  { address: "GAEUHW4ZVC656MRBJGN7B44UP6VYPAPI7HHYLGCRVP3E3GAPQG6ZZTDU", shares: 0, usdc_value: 0, pnl_pct: 0 },
 ];
 
 const TESTNET_VAULT = {
-  total_usdc: 452130000100,  // $45,213 TVL — real on-chain value
-  total_shares: 452130000100,
+  total_usdc: 580000059100,  // $58,000 TVL — real on-chain value
+  total_shares: 580000059100,
   total_profit: 0,
   active_liq: 0,
 };
