@@ -388,9 +388,22 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func handleState(w http.ResponseWriter, r *http.Request) {
 	state.mu.RLock()
-	defer state.mu.RUnlock()
+	snap := struct {
+		Keepers    []keeperRow            `json:"keepers"`
+		Positions  []posRow               `json:"positions"`
+		Events     []string               `json:"events"`
+		Vault      *vault.VaultState      `json:"vault"`
+		Depositors []DepositorRow         `json:"depositors"`
+	}{
+		Keepers:    state.Keepers,
+		Positions:  state.Positions,
+		Events:     state.Events,
+		Vault:      state.VaultState,
+		Depositors: state.Depositors,
+	}
+	state.mu.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(state); err != nil {
+	if err := json.NewEncoder(w).Encode(snap); err != nil {
 		logWarn("handleState encode error", "err", err)
 	}
 }
