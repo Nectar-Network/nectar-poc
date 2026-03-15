@@ -45,14 +45,14 @@ const TESTNET_KEEPER_STATS: Record<string, { name: string; address: string; liqu
   "keeper-alpha": {
     name: "keeper-alpha",
     address: "GCR36Y5AHRAMJGHJLA4EFORJKR3E4D4QVIMPFM26MWAP77DAQ463ZTGZ",
-    liquidations: 47,
-    total_profit: 32140000000, // ~$3,214
+    liquidations: 0,
+    total_profit: 0,
   },
   "keeper-beta": {
     name: "keeper-beta",
     address: "GBOE5QCNDXNSVSEMU3GJ3INAJITX44UOK5D5YXRIX523DYBSTPCS546F",
-    liquidations: 31,
-    total_profit: 18200000000, // ~$1,820
+    liquidations: 0,
+    total_profit: 0,
   },
 };
 
@@ -81,7 +81,13 @@ export default function PerformanceDashboard({ initialData }: Props) {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [live, setLive] = useState(!!initialData);
   const hasLiveData = data && data.depositors && data.depositors.length > 0;
-  const display = hasLiveData ? data : FALLBACK_DATA;
+  // Merge live data with fallback keeper stats (keeper-beta runs on a separate server)
+  const display = hasLiveData
+    ? {
+        ...data,
+        keeper_stats: { ...TESTNET_KEEPER_STATS, ...data.keeper_stats },
+      }
+    : FALLBACK_DATA;
 
   useEffect(() => {
     const poll = async () => {
