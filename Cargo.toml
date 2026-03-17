@@ -1,5 +1,5 @@
 [workspace]
-members = ["contracts/keeper-registry", "contracts/nectar-vault", "contracts/mock-token"]
+members = ["contracts/keeper-registry", "contracts/nectar-vault", "contracts/mock-token", "contracts/liquidation-lab"]
 resolver = "2"
 
 [profile.release]
