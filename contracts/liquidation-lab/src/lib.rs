@@ -172,10 +172,13 @@ impl LiquidationLab {
             }
         }
 
+        // Set block to 150 ledgers ago so the Dutch auction is already in
+        // the profitable zone (elapsed=150 → lotPct=75%, bidPct=25% → ratio=3.0)
+        let block = env.ledger().sequence().saturating_sub(150);
         let auction = AuctionData {
             lot,
             bid,
-            block: env.ledger().sequence(),
+            block,
         };
 
         env.storage().persistent().set(&key, &auction);
