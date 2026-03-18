@@ -177,9 +177,15 @@ func parseAssetMap(val xdr.ScVal) map[string]*big.Int {
 	return m
 }
 
-func isNotFound(s string) bool    { return contains(s, "AuctionNotFound") || contains(s, "NotFound") }
-func isAlreadyFilled(s string) bool { return contains(s, "AuctionNotFound") || contains(s, "AlreadyFilled") }
-func isAuctionExists(s string) bool { return contains(s, "AuctionExists") }
+func isNotFound(s string) bool {
+	return contains(s, "AuctionNotFound") || contains(s, "NotFound") || contains(s, "#4")
+}
+func isAlreadyFilled(s string) bool {
+	return contains(s, "AuctionNotFound") || contains(s, "AlreadyFilled") || contains(s, "#4")
+}
+func isAuctionExists(s string) bool {
+	return contains(s, "AuctionExists") || contains(s, "#5")
+}
 
 func contains(s, sub string) bool {
 	for i := 0; i <= len(s)-len(sub); i++ {
