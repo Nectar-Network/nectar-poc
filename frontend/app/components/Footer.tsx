@@ -15,8 +15,8 @@ export default function Footer() {
         </p>
         <div className="flex items-center gap-6 text-xs font-mono">
           {[
+            { label: "Twitter", href: "https://x.com/nectar_xlm" },
             { label: "GitHub", href: "https://github.com/nectar-network/nectar-poc" },
-            { label: "SCF #42", href: "https://dashboard.communityfund.stellar.org" },
             { label: "Blend Protocol", href: "https://blend.capital" },
           ].map((link) => (
             <a

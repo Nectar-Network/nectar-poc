@@ -64,6 +64,17 @@ export default function Nav() {
           );
         })}
         <a
+          href="https://x.com/nectar_xlm"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-mono transition-colors duration-200"
+          style={{ color: "var(--text-dim)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
+        >
+          Twitter
+        </a>
+        <a
           href="https://github.com/nectar-network/nectar-poc"
           target="_blank"
           rel="noopener noreferrer"
