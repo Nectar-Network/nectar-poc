@@ -81,10 +81,11 @@ func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passp
 	reqTypeVal := soroban.ScvU64(6) // RequestType::FillUserLiquidationAuction
 	zeroAmt := soroban.ScvU64(0)
 
+	// Keys MUST be in sorted lexicographic order for Soroban Map<Symbol, Val>
 	reqMap := xdr.ScMap{
-		{Key: soroban.ScvSymbol("request_type"), Val: reqTypeVal},
 		{Key: soroban.ScvSymbol("address"), Val: userVal},
 		{Key: soroban.ScvSymbol("amount"), Val: zeroAmt},
+		{Key: soroban.ScvSymbol("request_type"), Val: reqTypeVal},
 	}
 	reqMapPtr := &reqMap
 	reqVec := xdr.ScVec{{Type: xdr.ScValTypeScvMap, Map: &reqMapPtr}}

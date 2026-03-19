@@ -215,8 +215,8 @@ fn test_submit_fills_auction() {
         0u64.into_val(&env),
     );
 
-    let mut requests: soroban_sdk::Vec<soroban_sdk::Val> = soroban_sdk::Vec::new(&env);
-    requests.push_back(req_map.into_val(&env));
+    let mut requests: soroban_sdk::Vec<Map<soroban_sdk::Symbol, soroban_sdk::Val>> = soroban_sdk::Vec::new(&env);
+    requests.push_back(req_map);
 
     let result = client.submit(&keeper, &keeper, &keeper, &requests);
 
@@ -250,8 +250,8 @@ fn test_submit_already_filled() {
         0u64.into_val(&env),
     );
 
-    let mut requests: soroban_sdk::Vec<soroban_sdk::Val> = soroban_sdk::Vec::new(&env);
-    requests.push_back(req_map.into_val(&env));
+    let mut requests: soroban_sdk::Vec<Map<soroban_sdk::Symbol, soroban_sdk::Val>> = soroban_sdk::Vec::new(&env);
+    requests.push_back(req_map);
 
     let res = client.try_submit(&keeper, &keeper, &keeper, &requests);
     assert_eq!(res.err(), Some(Ok(LabError::AuctionNotFound)));
@@ -294,8 +294,8 @@ fn test_full_flow() {
     req_map.set(soroban_sdk::Symbol::new(&env, "address"), borrower.into_val(&env));
     req_map.set(soroban_sdk::Symbol::new(&env, "amount"), 0u64.into_val(&env));
 
-    let mut requests: soroban_sdk::Vec<soroban_sdk::Val> = soroban_sdk::Vec::new(&env);
-    requests.push_back(req_map.into_val(&env));
+    let mut requests: soroban_sdk::Vec<Map<soroban_sdk::Symbol, soroban_sdk::Val>> = soroban_sdk::Vec::new(&env);
+    requests.push_back(req_map);
 
     client.submit(&keeper, &keeper, &keeper, &requests);
 
