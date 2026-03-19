@@ -205,27 +205,26 @@ impl LiquidationLab {
 
     /// Fills an auction. The Go keeper sends request_type=6 (FillUserLiquidationAuction).
     /// We parse the requests to find the user, remove the auction, and clear the position.
+    ///
+    /// The keeper sends requests as Vec<Map<Symbol, Val>> where each map has:
+    /// {request_type: U64(6), address: Address(user), amount: U64(0)}
     pub fn submit(
         env: Env,
         from: Address,
         _spender: Address,
         _to: Address,
-        requests: Vec<Val>,
+        requests: Vec<Map<Symbol, Val>>,
     ) -> Result<UserPositions, LabError> {
         from.require_auth();
 
         // Parse requests to find the user being liquidated
-        // The keeper sends: [{request_type: 6, address: <user>, amount: 0}]
         let mut liquidated_user: Option<Address> = None;
 
         for i in 0..requests.len() {
-            let req_val = requests.get(i).unwrap();
-            // Try to extract the map entries
-            if let Ok(req_map) = soroban_sdk::Map::<Symbol, Val>::try_from_val(&env, &req_val) {
-                if let Some(addr_val) = req_map.get(Symbol::new(&env, "address")) {
-                    if let Ok(addr) = Address::try_from_val(&env, &addr_val) {
-                        liquidated_user = Some(addr);
-                    }
+            let req_map = requests.get(i).unwrap();
+            if let Some(addr_val) = req_map.get(Symbol::new(&env, "address")) {
+                if let Ok(addr) = Address::try_from_val(&env, &addr_val) {
+                    liquidated_user = Some(addr);
                 }
             }
         }
