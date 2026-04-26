@@ -109,6 +109,24 @@ func (c *Client) LatestLedger() (int64, error) {
 	return r.Sequence, c.call("getLatestLedger", nil, &r)
 }
 
+// LedgerEntry is a single getLedgerEntries result entry.
+type LedgerEntry struct {
+	Key                 string `json:"key"`
+	XDR                 string `json:"xdr"`
+	LastModifiedLedger  int64  `json:"lastModifiedLedgerSeq"`
+	LiveUntilLedgerSeq  int64  `json:"liveUntilLedgerSeq,omitempty"`
+}
+
+// GetLedgerEntries fetches raw ledger entries for the given base64-XDR keys.
+// Useful for direct contract-storage lookups when SimulateRead is overkill.
+func (c *Client) GetLedgerEntries(keys []string) ([]LedgerEntry, error) {
+	var r struct {
+		Entries []LedgerEntry `json:"entries"`
+	}
+	params := map[string]any{"keys": keys}
+	return r.Entries, c.call("getLedgerEntries", params, &r)
+}
+
 func (c *Client) GetAccount(horizonURL, address string) (int64, error) {
 	url := fmt.Sprintf("%s/accounts/%s", horizonURL, address)
 	resp, err := c.http.Get(url)

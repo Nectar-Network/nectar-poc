@@ -103,17 +103,38 @@ func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passp
 	return nil
 }
 
-// Profitability computes lot_value/bid_cost for a Blend Dutch auction at currentBlock.
-func Profitability(auction Auction, pool *PoolState, currentBlock int64) float64 {
-	elapsed := currentBlock - auction.StartBlock
-	if elapsed > 200 {
-		elapsed = 200
-	}
+// AuctionPhase describes which scaling phase a Blend Dutch auction is in.
+type AuctionPhase int
+
+const (
+	PhaseLotScaling AuctionPhase = iota // 0–200: lot grows 0→100 %, bid stays 100 %
+	PhaseBidScaling                     // 200–400: lot stays 100 %, bid shrinks 100→0 %
+	PhaseExpired                        // > 400: lot 100 %, bid 0 %
+)
+
+// PhaseAt reports the auction phase and the scaled lot/bid percentages.
+// Block boundaries are inclusive on the lower side (elapsed=200 → phase 2 at
+// the boundary, with lotPct=1.0 and bidPct=1.0).
+func PhaseAt(elapsed int64) (AuctionPhase, float64, float64) {
 	if elapsed < 0 {
 		elapsed = 0
 	}
-	lotPct := float64(elapsed) / 200.0
-	bidPct := float64(200-elapsed) / 200.0
+	switch {
+	case elapsed <= 200:
+		return PhaseLotScaling, float64(elapsed) / 200.0, 1.0
+	case elapsed <= 400:
+		return PhaseBidScaling, 1.0, float64(400-elapsed) / 200.0
+	default:
+		return PhaseExpired, 1.0, 0.0
+	}
+}
+
+// Profitability computes lot_value/bid_cost for a Blend Dutch auction at
+// currentBlock. The auction follows Blend v2's two-phase Dutch model: the
+// "fair price" point is at elapsed=200 where both legs are at 100 %.
+func Profitability(auction Auction, pool *PoolState, currentBlock int64) float64 {
+	elapsed := currentBlock - auction.StartBlock
+	_, lotPct, bidPct := PhaseAt(elapsed)
 
 	var lotVal, bidVal float64
 	for asset, amt := range auction.Lot {
@@ -136,6 +157,22 @@ func Profitability(auction Auction, pool *PoolState, currentBlock int64) float64
 		return math.Inf(1)
 	}
 	return lotVal / bidVal
+}
+
+// BidValueUSD totals the bid leg's USD value at the current scaling.
+func BidValueUSD(auction Auction, pool *PoolState, currentBlock int64) float64 {
+	elapsed := currentBlock - auction.StartBlock
+	_, _, bidPct := PhaseAt(elapsed)
+	var v float64
+	for asset, amt := range auction.Bid {
+		r, ok := pool.Reserves[asset]
+		if !ok {
+			continue
+		}
+		f, _ := new(big.Float).SetInt(amt).Float64()
+		v += (f / scalar) * bidPct * r.OraclePrice
+	}
+	return v
 }
 
 func parseAuction(val xdr.ScVal, user string) *Auction {
