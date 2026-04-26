@@ -18,78 +18,144 @@ func makePool(price float64) *PoolState {
 
 func makeBigInt(n int64) *big.Int { return big.NewInt(n) }
 
-func TestProfitability_Block0(t *testing.T) {
-	// At block 0, lot pct = 0 → lot value = 0 → ratio = 0
+func TestProfitability_Block0_LotZero(t *testing.T) {
+	// elapsed=0: lotPct=0, bidPct=1.0 → ratio=0 (lot empty, bid full).
 	auction := Auction{
 		StartBlock: 1000,
 		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
 		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
 	}
 	pool := makePool(1.0)
-	got := Profitability(auction, pool, 1000) // elapsed = 0
+	got := Profitability(auction, pool, 1000)
 	if got != 0 {
 		t.Fatalf("expected 0 at block 0, got %f", got)
 	}
 }
 
-func TestProfitability_Block100(t *testing.T) {
-	// At block 100: lotPct=0.5, bidPct=0.5 → ratio = 1.0 with equal values
+func TestProfitability_Block200_FairPrice(t *testing.T) {
+	// elapsed=200: lotPct=1.0, bidPct=1.0 → ratio=1.0 (the fair-price point).
 	auction := Auction{
 		StartBlock: 1000,
 		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
 		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
 	}
 	pool := makePool(1.0)
-	got := Profitability(auction, pool, 1100) // elapsed = 100
+	got := Profitability(auction, pool, 1200)
 	const eps = 1e-6
 	if math.Abs(got-1.0) > eps {
-		t.Fatalf("expected ~1.0 at block 100, got %f", got)
+		t.Fatalf("expected ~1.0 at fair-price block 200, got %f", got)
 	}
 }
 
-func TestProfitability_Block200(t *testing.T) {
-	// At block 200: bidPct=0 → infinite profit
+func TestProfitability_Block100_LotScaling(t *testing.T) {
+	// elapsed=100, phase 1: lotPct=0.5, bidPct=1.0 → ratio=0.5.
 	auction := Auction{
 		StartBlock: 1000,
 		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
 		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
 	}
 	pool := makePool(1.0)
-	got := Profitability(auction, pool, 1200) // elapsed = 200
-	if !math.IsInf(got, 1) {
-		t.Fatalf("expected +Inf at block 200, got %f", got)
+	got := Profitability(auction, pool, 1100)
+	const eps = 1e-6
+	if math.Abs(got-0.5) > eps {
+		t.Fatalf("expected 0.5 at block 100, got %f", got)
 	}
 }
 
-func TestProfitability_Block150_Profitable(t *testing.T) {
-	// At block 150: lotPct=0.75, bidPct=0.25
-	// lot = 1 XLM * 1.0 * 0.75 = 0.75
-	// bid = 1 USDC * 1.0 * 0.25 = 0.25
-	// ratio = 3.0
+func TestProfitability_Block300_BidScaling(t *testing.T) {
+	// elapsed=300, phase 2: lotPct=1.0, bidPct=0.5 → ratio=2.0.
+	auction := Auction{
+		StartBlock: 1000,
+		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
+		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
+	}
+	pool := makePool(1.0)
+	got := Profitability(auction, pool, 1300)
+	const eps = 1e-6
+	if math.Abs(got-2.0) > eps {
+		t.Fatalf("expected 2.0 at block 300, got %f", got)
+	}
+}
+
+func TestProfitability_Block400_BidZero(t *testing.T) {
+	// elapsed=400: lotPct=1.0, bidPct=0 → +Inf (free money).
+	auction := Auction{
+		StartBlock: 1000,
+		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
+		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
+	}
+	pool := makePool(1.0)
+	got := Profitability(auction, pool, 1400)
+	if !math.IsInf(got, 1) {
+		t.Fatalf("expected +Inf at block 400, got %f", got)
+	}
+}
+
+func TestProfitability_PastExpiry_StaysInfinite(t *testing.T) {
+	// elapsed > 400: still phase Expired with bidPct=0.
 	auction := Auction{
 		StartBlock: 0,
 		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
 		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
 	}
 	pool := makePool(1.0)
-	got := Profitability(auction, pool, 150)
-	const eps = 1e-4
-	if math.Abs(got-3.0) > eps {
-		t.Fatalf("expected ~3.0 at block 150, got %f", got)
+	got := Profitability(auction, pool, 800)
+	if !math.IsInf(got, 1) {
+		t.Fatalf("expected +Inf past expiry, got %f", got)
 	}
 }
 
-func TestProfitability_OverBlock200_Clamped(t *testing.T) {
-	// elapsed > 200 should be clamped to 200 → same result as block 200
+func TestPhaseAt_Boundaries(t *testing.T) {
+	cases := []struct {
+		name    string
+		elapsed int64
+		phase   AuctionPhase
+		lot     float64
+		bid     float64
+	}{
+		{"genesis", 0, PhaseLotScaling, 0.0, 1.0},
+		{"mid-lot", 100, PhaseLotScaling, 0.5, 1.0},
+		{"fair-price", 200, PhaseLotScaling, 1.0, 1.0},
+		{"early-bid", 250, PhaseBidScaling, 1.0, 0.75},
+		{"late-bid", 350, PhaseBidScaling, 1.0, 0.25},
+		{"expiry", 400, PhaseBidScaling, 1.0, 0.0},
+		{"post-expiry", 500, PhaseExpired, 1.0, 0.0},
+		{"negative", -10, PhaseLotScaling, 0.0, 1.0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotPhase, gotLot, gotBid := PhaseAt(c.elapsed)
+			if gotPhase != c.phase {
+				t.Errorf("phase: got %v want %v", gotPhase, c.phase)
+			}
+			const eps = 1e-9
+			if math.Abs(gotLot-c.lot) > eps {
+				t.Errorf("lot: got %f want %f", gotLot, c.lot)
+			}
+			if math.Abs(gotBid-c.bid) > eps {
+				t.Errorf("bid: got %f want %f", gotBid, c.bid)
+			}
+		})
+	}
+}
+
+func TestBidValueUSD_ScalesWithBid(t *testing.T) {
 	auction := Auction{
 		StartBlock: 0,
-		Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
-		Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
+		Bid:        map[string]*big.Int{"USDC": makeBigInt(100_0000000)}, // 100 USDC
 	}
 	pool := makePool(1.0)
-	got := Profitability(auction, pool, 500)
-	if !math.IsInf(got, 1) {
-		t.Fatalf("expected +Inf for clamped elapsed=200, got %f", got)
+	// Phase 1 (any block 0-200): bidPct=1.0 → 100 USD.
+	if got := BidValueUSD(auction, pool, 50); math.Abs(got-100.0) > 1e-6 {
+		t.Errorf("phase 1 bid value: got %f want 100", got)
+	}
+	// Phase 2 mid (block 300): bidPct=0.5 → 50 USD.
+	if got := BidValueUSD(auction, pool, 300); math.Abs(got-50.0) > 1e-6 {
+		t.Errorf("phase 2 bid value: got %f want 50", got)
+	}
+	// Expired (block 500): bidPct=0 → 0 USD.
+	if got := BidValueUSD(auction, pool, 500); got != 0 {
+		t.Errorf("expired bid value: got %f want 0", got)
 	}
 }
 
