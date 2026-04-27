@@ -27,7 +27,7 @@ Nectar replaces single-bot liquidation systems with a distributed network of com
 └───────────┼────────────────────┼────────────────────┼───────────┘
             │                    │                    │
      ┌──────┴────────────────────┴────────────────────┴──────┐
-     │  OFF-CHAIN (Render)                                    │
+     │  OFF-CHAIN (Railway)                                   │
      │                                                        │
      │  ┌────────────────────┐  ┌────────────────────┐       │
      │  │  Keeper Alpha      │  │  Keeper Beta       │       │
@@ -64,8 +64,9 @@ Nectar replaces single-bot liquidation systems with a distributed network of com
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| KeeperRegistry | `CAWT5HBM25OKGOMJHPFCXWXDWZ7FF436WXRKROTY2VW642FSKLYUKOUB` | [View](https://stellar.expert/explorer/testnet/contract/CAWT5HBM25OKGOMJHPFCXWXDWZ7FF436WXRKROTY2VW642FSKLYUKOUB) |
-| NectarVault | `CCXDLRE3IV5225LE3Z776KFB2VWD2MTXOJHAUKFA5RPYDJVOWCMHJ4U4` | [View](https://stellar.expert/explorer/testnet/contract/CCXDLRE3IV5225LE3Z776KFB2VWD2MTXOJHAUKFA5RPYDJVOWCMHJ4U4) |
+| KeeperRegistry | `CAEHWZOOEP6YSU3EJDO7B2L7QJTG4YHXJIACRBWRTFRPMRVND56LTWAO` | [View](https://stellar.expert/explorer/testnet/contract/CAEHWZOOEP6YSU3EJDO7B2L7QJTG4YHXJIACRBWRTFRPMRVND56LTWAO) |
+| NectarVault | `CCSR5GT6BEZXCW5UWV4LOXC24L75YQ7JJ5Q3Q7WJKLCGSKOSWOELJJFQ` | [View](https://stellar.expert/explorer/testnet/contract/CCSR5GT6BEZXCW5UWV4LOXC24L75YQ7JJ5Q3Q7WJKLCGSKOSWOELJJFQ) |
+| USDC (mock SAC) | `CD3YAGUK4SV67PIHRYKR5QAKTNVIGVDAXT6P426EO2E76DAXGMPLMSAH` | [View](https://stellar.expert/explorer/testnet/contract/CD3YAGUK4SV67PIHRYKR5QAKTNVIGVDAXT6P426EO2E76DAXGMPLMSAH) |
 | LiquidationLab | `CDOXKPEBRQG3MSDOWBROUVGRO6TTC4NJJPW7GCXCR5WR5SUSMEAFE7Y5` | [View](https://stellar.expert/explorer/testnet/contract/CDOXKPEBRQG3MSDOWBROUVGRO6TTC4NJJPW7GCXCR5WR5SUSMEAFE7Y5) |
 | USDC Token (SAC) | `CAVBAVD6CZ46FEDKJHBQIJF7EFAZDTRNS65G73QS5ZYI3VK5E2JFPQ4J` | [View](https://stellar.expert/explorer/testnet/contract/CAVBAVD6CZ46FEDKJHBQIJF7EFAZDTRNS65G73QS5ZYI3VK5E2JFPQ4J) |
 
@@ -103,7 +104,7 @@ nectar-poc/
 │       └── stellar.ts        # Freighter wallet integration
 ├── scripts/                  # Deployment + provisioning scripts
 ├── docker-compose.yml        # Keeper Alpha + Beta + Frontend
-├── render.yaml               # Render.com deployment blueprint
+├── keeper/railway.toml       # Railway deployment config (keeper)
 └── wallets.md                # All testnet wallet addresses (public keys)
 ```
 
@@ -293,18 +294,44 @@ cd frontend && npm run build
 
 ## Deployment
 
-### Render (Keepers)
+### Railway (Keepers)
 
-Both keepers deploy via `render.yaml` blueprint:
-- Docker builds from `keeper/Dockerfile`
-- Free tier with auto-sleep/wake
-- Auto-deploy on git push
+Keepers run as Railway services using `keeper/Dockerfile`. From `keeper/`:
+
+```bash
+railway login
+railway init                # one-time, links to a Railway project
+railway up                  # builds via Dockerfile and deploys
+```
+
+Required env vars in the Railway dashboard (mark `KEEPER_SECRET` as secret):
+
+```
+KEEPER_SECRET       S...                                                         # operator key
+KEEPER_NAME         keeper-alpha
+REGISTRY_CONTRACT   CAEHWZOOEP6YSU3EJDO7B2L7QJTG4YHXJIACRBWRTFRPMRVND56LTWAO
+VAULT_CONTRACT      CCSR5GT6BEZXCW5UWV4LOXC24L75YQ7JJ5Q3Q7WJKLCGSKOSWOELJJFQ
+USDC_CONTRACT       CD3YAGUK4SV67PIHRYKR5QAKTNVIGVDAXT6P426EO2E76DAXGMPLMSAH
+BLEND_POOL          C...                                                          # Blend testnet pool
+SOROBAN_RPC         https://soroban-testnet.stellar.org:443
+HORIZON_URL         https://horizon-testnet.stellar.org
+POLL_INTERVAL       10
+MIN_PROFIT          1.02
+API_PORT            8080
+```
+
+Healthcheck endpoint: `/healthz` (configured in `railway.toml`).
 
 ### Vercel (Frontend)
 
-Next.js deployed to Vercel with `output: "standalone"`:
-- Custom domain: nectarnetwork.fun
-- Environment variables for contract addresses and API URL
+Next.js deployed to Vercel with `output: "standalone"`. Required env vars:
+
+```
+NEXT_PUBLIC_REGISTRY_CONTRACT  CAEHWZOOEP6YSU3EJDO7B2L7QJTG4YHXJIACRBWRTFRPMRVND56LTWAO
+NEXT_PUBLIC_VAULT_CONTRACT     CCSR5GT6BEZXCW5UWV4LOXC24L75YQ7JJ5Q3Q7WJKLCGSKOSWOELJJFQ
+NEXT_PUBLIC_USDC_CONTRACT      CD3YAGUK4SV67PIHRYKR5QAKTNVIGVDAXT6P426EO2E76DAXGMPLMSAH
+NEXT_PUBLIC_API_URL            https://<your-railway-keeper>.up.railway.app
+```
 
 ## License
 
