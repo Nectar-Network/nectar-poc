@@ -98,10 +98,17 @@ export async function connectWallet(): Promise<WalletState | null> {
     });
 
     // Open the auth modal — picker for all configured wallets.
-    const { address } = await kit.authModal();
-    off();
+    let address: string;
+    try {
+      ({ address } = await kit.authModal());
+    } finally {
+      off();
+    }
+    if (!address) return null; // user closed the modal without picking
 
-    const networkResult = await kit.getNetwork();
+    // We initialized the kit with Networks.TESTNET, so we know the network
+    // without asking the wallet — Albedo doesn't implement getNetwork() and
+    // throws code -3, so we skip the call entirely.
     const walletId =
       window.localStorage.getItem(STORAGE_SELECTED_WALLET) ?? undefined;
 
@@ -129,14 +136,30 @@ export async function connectWallet(): Promise<WalletState | null> {
     return {
       connected: true,
       address,
-      network: networkResult?.network || "TESTNET",
+      network: "TESTNET",
       balance: xlmBalance,
       usdcBalance,
       walletId,
     };
   } catch (err) {
     console.error("Wallet connection failed:", err);
-    throw err;
+    // Albedo + xBull throw plain `{ code, message }` objects, not Error
+    // instances. Normalize and quietly swallow user-cancellation cases so
+    // the UI doesn't show a scary error for normal interactions.
+    const obj = err as { code?: number; message?: string };
+    const code = typeof obj?.code === "number" ? obj.code : undefined;
+    const msg =
+      err instanceof Error
+        ? err.message
+        : obj?.message ?? String(err);
+    const userCancelled =
+      code === -4 ||
+      /closed/i.test(msg) ||
+      /cancell?ed/i.test(msg) ||
+      /user reject/i.test(msg) ||
+      /declined/i.test(msg);
+    if (userCancelled) return null;
+    throw err instanceof Error ? err : new Error(msg || "Wallet connection failed");
   }
 }
 
