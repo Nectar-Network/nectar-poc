@@ -36,6 +36,18 @@ const VAULT_INFO = {
   depositors: 22,
 };
 
+function walletDisplayName(id: string | undefined): string {
+  switch (id) {
+    case "freighter": return "Freighter";
+    case "albedo": return "Albedo";
+    case "xbull": return "xBull";
+    case "lobstr": return "Lobstr";
+    case "hana": return "Hana";
+    case "rabet": return "Rabet";
+    default: return "wallet";
+  }
+}
+
 export default function VaultApp() {
   const [tab, setTab] = useState<Tab>("deposit");
   const [amount, setAmount] = useState("");
@@ -890,7 +902,7 @@ export default function VaultApp() {
                     {txStatus === "simulating"
                       ? "Simulating..."
                       : txStatus === "signing"
-                      ? "Sign in Freighter..."
+                      ? `Sign in ${walletDisplayName(wallet?.walletId)}...`
                       : txStatus === "submitted"
                       ? "Confirming on Soroban..."
                       : tab === "deposit"
