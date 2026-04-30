@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatUSDC, formatDuration, sharePrice } from "../../lib/api";
 import {
-  checkFreighter,
   connectWallet,
+  disconnectWallet,
   depositToVault,
   withdrawFromVault,
   queryVaultBalance,
@@ -43,7 +43,6 @@ export default function VaultApp() {
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState("");
-  const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
   const [vaultShares, setVaultShares] = useState<number>(0);
   const [vaultUsdcValue, setVaultUsdcValue] = useState<number>(0);
   const [vaultCfg, setVaultCfg] = useState<VaultConfig | null>(null);
@@ -55,11 +54,6 @@ export default function VaultApp() {
   const [keeperBusy, setKeeperBusy] = useState(false);
   const [keeperError, setKeeperError] = useState("");
   const [now, setNow] = useState<number>(() => Math.floor(Date.now() / 1000));
-
-  // Check Freighter on mount
-  useEffect(() => {
-    checkFreighter().then(setHasFreighter);
-  }, []);
 
   // Tick once a second so the cooldown countdown updates without re-querying chain.
   useEffect(() => {
@@ -117,7 +111,8 @@ export default function VaultApp() {
     }
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    await disconnectWallet();
     setWallet(null);
     setVaultShares(0);
     setVaultUsdcValue(0);
@@ -676,25 +671,6 @@ export default function VaultApp() {
             <div style={{ padding: "24px" }}>
               {!connected ? (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
-                  {hasFreighter === false && (
-                    <div style={{
-                      fontSize: "12px", color: "var(--amber)", fontFamily: "monospace",
-                      marginBottom: "16px", padding: "8px 12px", background: "rgba(230, 172, 47, 0.08)",
-                      border: "1px solid rgba(230, 172, 47, 0.2)", borderRadius: "2px",
-                    }}>
-                      Freighter wallet extension not detected.
-                      <br />
-                      <a
-                        href="https://www.freighter.app/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "var(--accent)", textDecoration: "underline" }}
-                      >
-                        Install Freighter
-                      </a>
-                      {" "}to interact with the vault.
-                    </div>
-                  )}
                   <div style={{ fontSize: "13px", color: "var(--text-dim)", fontFamily: "monospace", marginBottom: "16px" }}>
                     Connect your Stellar wallet to {tab}
                   </div>
@@ -712,10 +688,10 @@ export default function VaultApp() {
                       letterSpacing: "0.05em",
                     }}
                   >
-                    Connect Freighter
+                    Connect Wallet
                   </button>
                   <div style={{ fontSize: "11px", color: "var(--text-dim)", fontFamily: "monospace", marginTop: "12px" }}>
-                    Stellar wallet for Soroban dApps
+                    Freighter · Albedo · xBull · Lobstr · Hana · Rabet
                   </div>
                   {error && (
                     <div style={{ fontSize: "11px", color: "var(--red)", fontFamily: "monospace", marginTop: "8px" }}>
