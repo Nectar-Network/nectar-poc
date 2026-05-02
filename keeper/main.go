@@ -49,9 +49,9 @@ type DepositorRow struct {
 
 // appMetrics are updated atomically to avoid lock contention.
 type appMetrics struct {
-	cyclesTotal      atomic.Int64
+	cyclesTotal       atomic.Int64
 	liquidationsTotal atomic.Int64
-	sseActive        atomic.Int64
+	sseActive         atomic.Int64
 }
 
 // State is the shared data bag for HTTP handlers and the keeper loop.
@@ -83,8 +83,8 @@ type posRow struct {
 }
 
 var (
-	state   = &State{KeeperStats: map[string]*KeeperStat{}}
-	appMet  = &appMetrics{}
+	state  = &State{KeeperStats: map[string]*KeeperStat{}}
+	appMet = &appMetrics{}
 )
 
 // addEvent appends msg to the ring-buffer and broadcasts to SSE subscribers.
@@ -389,11 +389,11 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func handleState(w http.ResponseWriter, r *http.Request) {
 	state.mu.RLock()
 	snap := struct {
-		Keepers    []keeperRow            `json:"keepers"`
-		Positions  []posRow               `json:"positions"`
-		Events     []string               `json:"events"`
-		Vault      *vault.VaultState      `json:"vault"`
-		Depositors []DepositorRow         `json:"depositors"`
+		Keepers    []keeperRow       `json:"keepers"`
+		Positions  []posRow          `json:"positions"`
+		Events     []string          `json:"events"`
+		Vault      *vault.VaultState `json:"vault"`
+		Depositors []DepositorRow    `json:"depositors"`
 	}{
 		Keepers:    state.Keepers,
 		Positions:  state.Positions,

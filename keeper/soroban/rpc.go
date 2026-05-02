@@ -33,18 +33,18 @@ type SimEntry struct {
 }
 
 type TxResult struct {
-	Status        string `json:"status"`
-	Hash          string
-	ResultXDR     string `json:"resultXdr,omitempty"`
+	Status         string `json:"status"`
+	Hash           string
+	ResultXDR      string `json:"resultXdr,omitempty"`
 	ErrorResultXDR string `json:"errorResultXdr,omitempty"`
 }
 
 type Event struct {
-	Type        string   `json:"type"`
-	ContractID  string   `json:"contractId"`
-	Topic       []string `json:"topic"`
-	Value       string   `json:"value"`
-	Ledger      int64    `json:"ledger"`
+	Type       string   `json:"type"`
+	ContractID string   `json:"contractId"`
+	Topic      []string `json:"topic"`
+	Value      string   `json:"value"`
+	Ledger     int64    `json:"ledger"`
 }
 
 func (c *Client) Simulate(txXDR string) (*SimulateResult, error) {
@@ -107,6 +107,24 @@ func (c *Client) LatestLedger() (int64, error) {
 		Sequence int64 `json:"sequence"`
 	}
 	return r.Sequence, c.call("getLatestLedger", nil, &r)
+}
+
+// LedgerEntry is a single getLedgerEntries result entry.
+type LedgerEntry struct {
+	Key                string `json:"key"`
+	XDR                string `json:"xdr"`
+	LastModifiedLedger int64  `json:"lastModifiedLedgerSeq"`
+	LiveUntilLedgerSeq int64  `json:"liveUntilLedgerSeq,omitempty"`
+}
+
+// GetLedgerEntries fetches raw ledger entries for the given base64-XDR keys.
+// Useful for direct contract-storage lookups when SimulateRead is overkill.
+func (c *Client) GetLedgerEntries(keys []string) ([]LedgerEntry, error) {
+	var r struct {
+		Entries []LedgerEntry `json:"entries"`
+	}
+	params := map[string]any{"keys": keys}
+	return r.Entries, c.call("getLedgerEntries", params, &r)
 }
 
 func (c *Client) GetAccount(horizonURL, address string) (int64, error) {
