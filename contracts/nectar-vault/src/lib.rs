@@ -47,13 +47,21 @@ impl NectarVault {
         require_init(&env)?;
         user.require_auth();
 
-        let usdc: Address = env.storage().instance().get(&VaultKey::Usdc).unwrap();
+        let usdc: Address = env
+            .storage()
+            .instance()
+            .get(&VaultKey::Usdc)
+            .ok_or(VaultError::NotInit)?;
         let cfg: VaultConfig = env
             .storage()
             .instance()
             .get(&VaultKey::VaultConfig)
-            .unwrap();
-        let mut state: VaultState = env.storage().instance().get(&VaultKey::State).unwrap();
+            .ok_or(VaultError::NotInit)?;
+        let mut state: VaultState = env
+            .storage()
+            .instance()
+            .get(&VaultKey::State)
+            .ok_or(VaultError::NotInit)?;
 
         if cfg.deposit_cap > 0 && state.total_usdc + amount > cfg.deposit_cap {
             return Err(VaultError::DepositCapExceeded);
@@ -120,13 +128,17 @@ impl NectarVault {
             .storage()
             .instance()
             .get(&VaultKey::VaultConfig)
-            .unwrap();
+            .ok_or(VaultError::NotInit)?;
         let now = env.ledger().timestamp();
         if now.saturating_sub(depositor.last_deposit_time) < cfg.withdraw_cooldown {
             return Err(VaultError::WithdrawalCooldown);
         }
 
-        let mut state: VaultState = env.storage().instance().get(&VaultKey::State).unwrap();
+        let mut state: VaultState = env
+            .storage()
+            .instance()
+            .get(&VaultKey::State)
+            .ok_or(VaultError::NotInit)?;
         if state.total_shares == 0 {
             return Err(VaultError::InsufficientVault);
         }
@@ -137,7 +149,11 @@ impl NectarVault {
         // formula naturally returns the full state.total_usdc.
         let usdc_out = shares * state.total_usdc / state.total_shares;
 
-        let usdc: Address = env.storage().instance().get(&VaultKey::Usdc).unwrap();
+        let usdc: Address = env
+            .storage()
+            .instance()
+            .get(&VaultKey::Usdc)
+            .ok_or(VaultError::NotInit)?;
         token::Client::new(&env, &usdc).transfer(&env.current_contract_address(), &user, &usdc_out);
 
         depositor.shares -= shares;
@@ -195,19 +211,27 @@ impl NectarVault {
             .storage()
             .instance()
             .get(&VaultKey::VaultConfig)
-            .unwrap();
+            .ok_or(VaultError::NotInit)?;
         if cfg.max_draw_per_keeper > 0 && amount > cfg.max_draw_per_keeper {
             return Err(VaultError::DrawLimitExceeded);
         }
 
-        let mut state: VaultState = env.storage().instance().get(&VaultKey::State).unwrap();
+        let mut state: VaultState = env
+            .storage()
+            .instance()
+            .get(&VaultKey::State)
+            .ok_or(VaultError::NotInit)?;
         let available = state.total_usdc - state.active_liq;
         if amount > available {
             return Err(VaultError::InsufficientVault);
         }
-        require_registered_keeper(&env, &keeper);
+        require_registered_keeper(&env, &keeper)?;
 
-        let usdc: Address = env.storage().instance().get(&VaultKey::Usdc).unwrap();
+        let usdc: Address = env
+            .storage()
+            .instance()
+            .get(&VaultKey::Usdc)
+            .ok_or(VaultError::NotInit)?;
         token::Client::new(&env, &usdc).transfer(&env.current_contract_address(), &keeper, &amount);
 
         // Track per-keeper outstanding draw so return_proceeds can compute profit.
@@ -223,7 +247,7 @@ impl NectarVault {
 
         // Notify the registry that this keeper now has an outstanding draw.
         if amount > 0 {
-            registry_call(&env, "mark_draw", &keeper);
+            registry_call(&env, "mark_draw", &keeper)?;
         }
 
         env.events()
@@ -237,13 +261,21 @@ impl NectarVault {
         require_init(&env)?;
         keeper.require_auth();
 
-        let usdc: Address = env.storage().instance().get(&VaultKey::Usdc).unwrap();
+        let usdc: Address = env
+            .storage()
+            .instance()
+            .get(&VaultKey::Usdc)
+            .ok_or(VaultError::NotInit)?;
         token::Client::new(&env, &usdc).transfer(&keeper, &env.current_contract_address(), &amount);
 
         let draw_key = VaultKey::KeeperDraw(keeper.clone());
         let drawn: i128 = env.storage().persistent().get(&draw_key).unwrap_or(0);
 
-        let mut state: VaultState = env.storage().instance().get(&VaultKey::State).unwrap();
+        let mut state: VaultState = env
+            .storage()
+            .instance()
+            .get(&VaultKey::State)
+            .ok_or(VaultError::NotInit)?;
         let repay = if amount < state.active_liq {
             amount
         } else {
@@ -266,8 +298,8 @@ impl NectarVault {
         // Clear per-keeper draw record.
         if drawn > 0 {
             env.storage().persistent().remove(&draw_key);
-            registry_call(&env, "clear_draw", &keeper);
-            registry_record_execution(&env, &keeper, true, profit);
+            registry_call(&env, "clear_draw", &keeper)?;
+            registry_record_execution(&env, &keeper, true, profit)?;
         }
 
         env.events().publish(
@@ -277,9 +309,12 @@ impl NectarVault {
         Ok(())
     }
 
-    pub fn get_state(env: Env) -> VaultState {
+    pub fn get_state(env: Env) -> Result<VaultState, VaultError> {
         env.storage().instance().extend_ttl(1000, 1000);
-        env.storage().instance().get(&VaultKey::State).unwrap()
+        env.storage()
+            .instance()
+            .get(&VaultKey::State)
+            .ok_or(VaultError::NotInit)
     }
 
     pub fn get_config(env: Env) -> Result<VaultConfig, VaultError> {
@@ -323,39 +358,46 @@ fn require_init(env: &Env) -> Result<(), VaultError> {
     Ok(())
 }
 
-fn require_registered_keeper(env: &Env, keeper: &Address) {
+fn require_registered_keeper(env: &Env, keeper: &Address) -> Result<(), VaultError> {
     let registry: Address = env
         .storage()
         .instance()
         .get(&VaultKey::KeeperRegistry)
-        .unwrap();
+        .ok_or(VaultError::NotInit)?;
     let _: soroban_sdk::Val = env.invoke_contract(
         &registry,
         &Symbol::new(env, "get_keeper"),
         soroban_sdk::vec![env, keeper.to_val()],
     );
+    Ok(())
 }
 
-fn registry_call(env: &Env, fn_name: &str, keeper: &Address) {
+fn registry_call(env: &Env, fn_name: &str, keeper: &Address) -> Result<(), VaultError> {
     let registry: Address = env
         .storage()
         .instance()
         .get(&VaultKey::KeeperRegistry)
-        .unwrap();
+        .ok_or(VaultError::NotInit)?;
     let vault = env.current_contract_address();
     let _: soroban_sdk::Val = env.invoke_contract(
         &registry,
         &Symbol::new(env, fn_name),
         vec![env, vault.into_val(env), keeper.into_val(env)],
     );
+    Ok(())
 }
 
-fn registry_record_execution(env: &Env, keeper: &Address, success: bool, profit: i128) {
+fn registry_record_execution(
+    env: &Env,
+    keeper: &Address,
+    success: bool,
+    profit: i128,
+) -> Result<(), VaultError> {
     let registry: Address = env
         .storage()
         .instance()
         .get(&VaultKey::KeeperRegistry)
-        .unwrap();
+        .ok_or(VaultError::NotInit)?;
     let vault = env.current_contract_address();
     let _: soroban_sdk::Val = env.invoke_contract(
         &registry,
@@ -368,6 +410,7 @@ fn registry_record_execution(env: &Env, keeper: &Address, success: bool, profit:
             profit.into_val(env),
         ],
     );
+    Ok(())
 }
 
 #[cfg(test)]
