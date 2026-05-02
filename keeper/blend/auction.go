@@ -12,8 +12,59 @@ import (
 	"github.com/nectar-network/keeper/soroban"
 )
 
+// AuctionType matches Blend v2's on-chain enum for auction storage.
+// The mapping to RequestType (used by submit() to fill) is:
+//
+//	UserLiquidation (0) → RequestType 6 (FillUserLiquidationAuction)
+//	BadDebtAuction  (1) → RequestType 7 (FillBadDebtAuction)
+//	InterestAuction (2) → RequestType 8 (FillInterestAuction)
+type AuctionType uint64
+
+const (
+	AuctionUserLiquidation AuctionType = 0
+	AuctionBadDebt         AuctionType = 1
+	AuctionInterest        AuctionType = 2
+)
+
+// AllAuctionTypes is the canonical scan order for DetectAuctions.
+var AllAuctionTypes = []AuctionType{
+	AuctionUserLiquidation,
+	AuctionBadDebt,
+	AuctionInterest,
+}
+
+// requestTypeFor returns the Blend submit() request_type that fills the given
+// auction kind.
+func (t AuctionType) requestType() uint64 {
+	switch t {
+	case AuctionUserLiquidation:
+		return 6
+	case AuctionBadDebt:
+		return 7
+	case AuctionInterest:
+		return 8
+	default:
+		return 6
+	}
+}
+
+// String pretty-prints the auction kind for log lines.
+func (t AuctionType) String() string {
+	switch t {
+	case AuctionUserLiquidation:
+		return "user_liquidation"
+	case AuctionBadDebt:
+		return "bad_debt"
+	case AuctionInterest:
+		return "interest"
+	default:
+		return fmt.Sprintf("unknown(%d)", uint64(t))
+	}
+}
+
 type Auction struct {
 	User       string
+	Type       AuctionType
 	StartBlock int64
 	Lot        map[string]*big.Int
 	Bid        map[string]*big.Int
@@ -21,7 +72,9 @@ type Auction struct {
 
 var ErrAlreadyFilled = errors.New("auction already filled by another keeper")
 
-// CreateAuction calls new_liquidation_auction on the Blend pool.
+// CreateAuction calls new_liquidation_auction on the Blend pool. This only
+// applies to user-liquidation auctions; interest and bad-debt auctions are
+// triggered by the pool's internal accounting (no creation entry-point).
 func CreateAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, user string, pct int) error {
 	userVal, err := soroban.ScvAddress(user)
 	if err != nil {
@@ -39,13 +92,14 @@ func CreateAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, pas
 	return nil
 }
 
-// GetAuction fetches an existing liquidation auction for user.
-func GetAuction(rpc *soroban.Client, passphrase, poolAddr, user string) (*Auction, error) {
+// GetAuctionByType fetches an auction of the given kind for the user/address.
+// Returns (nil, nil) when no such auction exists (clean miss).
+func GetAuctionByType(rpc *soroban.Client, passphrase, poolAddr, user string, kind AuctionType) (*Auction, error) {
 	userVal, err := soroban.ScvAddress(user)
 	if err != nil {
 		return nil, err
 	}
-	auctType := soroban.ScvU64(0) // 0 = UserLiquidation
+	auctType := soroban.ScvU64(uint64(kind))
 
 	sim, err := rpc.SimulateRead(passphrase, poolAddr, "get_auction", auctType, userVal)
 	if err != nil {
@@ -64,11 +118,40 @@ func GetAuction(rpc *soroban.Client, passphrase, poolAddr, user string) (*Auctio
 	if err := xdr.SafeUnmarshalBase64(sim.Results[0].XDR, &val); err != nil {
 		return nil, err
 	}
-	return parseAuction(val, user), nil
+	a := parseAuction(val, user)
+	a.Type = kind
+	return a, nil
 }
 
-// FillAuction fills an active auction via pool.submit().
-func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, user string) error {
+// GetAuction is the legacy single-type lookup, kept for backward compat. It
+// only checks for user-liquidation auctions; new code should prefer
+// GetAuctionByType or DetectAuctions.
+func GetAuction(rpc *soroban.Client, passphrase, poolAddr, user string) (*Auction, error) {
+	return GetAuctionByType(rpc, passphrase, poolAddr, user, AuctionUserLiquidation)
+}
+
+// DetectAuctions scans all three auction kinds for the given address and
+// returns whichever (if any) currently exist. RPC errors on any single kind
+// are wrapped and returned, but a clean "not found" on one kind doesn't stop
+// the scan.
+func DetectAuctions(rpc *soroban.Client, passphrase, poolAddr, user string) ([]*Auction, error) {
+	out := make([]*Auction, 0, 3)
+	for _, kind := range AllAuctionTypes {
+		a, err := GetAuctionByType(rpc, passphrase, poolAddr, user, kind)
+		if err != nil {
+			return out, fmt.Errorf("detect %s: %w", kind, err)
+		}
+		if a != nil {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+// fillAuctionRequest builds the Soroban submit() arguments and invokes the
+// pool. addr/from/spender are all the keeper. The request map is the same
+// shape across all three fill paths — only the request_type constant changes.
+func fillAuctionRequest(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, user string, kind AuctionType) error {
 	fromVal, err := soroban.ScvAddress(kp.Address())
 	if err != nil {
 		return err
@@ -78,10 +161,10 @@ func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passp
 		return err
 	}
 
-	reqTypeVal := soroban.ScvU64(6) // RequestType::FillUserLiquidationAuction
+	reqTypeVal := soroban.ScvU64(kind.requestType())
 	zeroAmt := soroban.ScvU64(0)
 
-	// Keys MUST be in sorted lexicographic order for Soroban Map<Symbol, Val>
+	// Keys MUST be in sorted lexicographic order for Soroban Map<Symbol, Val>.
 	reqMap := xdr.ScMap{
 		{Key: soroban.ScvSymbol("address"), Val: userVal},
 		{Key: soroban.ScvSymbol("amount"), Val: zeroAmt},
@@ -98,9 +181,37 @@ func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passp
 		if isAlreadyFilled(err.Error()) {
 			return ErrAlreadyFilled
 		}
-		return fmt.Errorf("fill auction: %w", err)
+		return fmt.Errorf("fill %s auction: %w", kind, err)
 	}
 	return nil
+}
+
+// FillAuction fills a user-liquidation auction (request_type 6).
+// Backward-compat alias for FillUserLiquidationAuction.
+func FillAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, user string) error {
+	return fillAuctionRequest(rpc, horizonURL, kp, passphrase, poolAddr, user, AuctionUserLiquidation)
+}
+
+// FillUserLiquidationAuction fills a user-liquidation auction (request_type 6).
+func FillUserLiquidationAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, user string) error {
+	return fillAuctionRequest(rpc, horizonURL, kp, passphrase, poolAddr, user, AuctionUserLiquidation)
+}
+
+// FillBadDebtAuction fills a bad-debt auction (request_type 7). The bidder
+// takes on socialized bad debt in exchange for the lot of bToken collateral.
+func FillBadDebtAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, addr string) error {
+	return fillAuctionRequest(rpc, horizonURL, kp, passphrase, poolAddr, addr, AuctionBadDebt)
+}
+
+// FillInterestAuction fills an interest auction (request_type 8). The bidder
+// pays BLND in exchange for accumulated backstop interest.
+func FillInterestAuction(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, addr string) error {
+	return fillAuctionRequest(rpc, horizonURL, kp, passphrase, poolAddr, addr, AuctionInterest)
+}
+
+// FillByType dispatches to the right Fill* function based on the auction kind.
+func FillByType(rpc *soroban.Client, horizonURL string, kp *keypair.Full, passphrase, poolAddr, addr string, kind AuctionType) error {
+	return fillAuctionRequest(rpc, horizonURL, kp, passphrase, poolAddr, addr, kind)
 }
 
 // AuctionPhase describes which scaling phase a Blend Dutch auction is in.
@@ -131,7 +242,10 @@ func PhaseAt(elapsed int64) (AuctionPhase, float64, float64) {
 
 // Profitability computes lot_value/bid_cost for a Blend Dutch auction at
 // currentBlock. The auction follows Blend v2's two-phase Dutch model: the
-// "fair price" point is at elapsed=200 where both legs are at 100 %.
+// "fair price" point is at elapsed=200 where both legs are at 100 %. Profit
+// math is identical across the three auction kinds — the only difference is
+// what the lot/bid maps contain (collateral vs. backstop interest vs. bad
+// debt), which the caller has already populated by the time this runs.
 func Profitability(auction Auction, pool *PoolState, currentBlock int64) float64 {
 	elapsed := currentBlock - auction.StartBlock
 	_, lotPct, bidPct := PhaseAt(elapsed)

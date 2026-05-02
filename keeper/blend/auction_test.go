@@ -159,6 +159,78 @@ func TestBidValueUSD_ScalesWithBid(t *testing.T) {
 	}
 }
 
+func TestAuctionType_RequestType(t *testing.T) {
+	cases := []struct {
+		kind AuctionType
+		want uint64
+	}{
+		{AuctionUserLiquidation, 6},
+		{AuctionBadDebt, 7},
+		{AuctionInterest, 8},
+	}
+	for _, c := range cases {
+		if got := c.kind.requestType(); got != c.want {
+			t.Errorf("requestType(%v) = %d, want %d", c.kind, got, c.want)
+		}
+	}
+}
+
+func TestAuctionType_String(t *testing.T) {
+	cases := []struct {
+		kind AuctionType
+		want string
+	}{
+		{AuctionUserLiquidation, "user_liquidation"},
+		{AuctionBadDebt, "bad_debt"},
+		{AuctionInterest, "interest"},
+	}
+	for _, c := range cases {
+		if got := c.kind.String(); got != c.want {
+			t.Errorf("String(%d) = %q, want %q", c.kind, got, c.want)
+		}
+	}
+	// Unknown variant should still produce something useful for logs.
+	if got := AuctionType(99).String(); got == "" {
+		t.Error("unknown variant should not return empty string")
+	}
+}
+
+func TestAllAuctionTypes_CoversAllVariants(t *testing.T) {
+	if len(AllAuctionTypes) != 3 {
+		t.Fatalf("AllAuctionTypes should have 3 entries, got %d", len(AllAuctionTypes))
+	}
+	seen := map[AuctionType]bool{}
+	for _, k := range AllAuctionTypes {
+		seen[k] = true
+	}
+	for _, want := range []AuctionType{AuctionUserLiquidation, AuctionBadDebt, AuctionInterest} {
+		if !seen[want] {
+			t.Errorf("AllAuctionTypes missing variant %v", want)
+		}
+	}
+}
+
+// TestProfitability_AuctionTypeAgnostic asserts that the same Profitability
+// formula applies regardless of auction kind — only the lot/bid amounts and
+// oracle prices matter, never the type discriminant.
+func TestProfitability_AuctionTypeAgnostic(t *testing.T) {
+	pool := makePool(1.0)
+	build := func(kind AuctionType) Auction {
+		return Auction{
+			Type:       kind,
+			StartBlock: 1000,
+			Lot:        map[string]*big.Int{"XLM": makeBigInt(1_0000000)},
+			Bid:        map[string]*big.Int{"USDC": makeBigInt(1_0000000)},
+		}
+	}
+	user := Profitability(build(AuctionUserLiquidation), pool, 1200)
+	bad := Profitability(build(AuctionBadDebt), pool, 1200)
+	intr := Profitability(build(AuctionInterest), pool, 1200)
+	if math.Abs(user-bad) > 1e-9 || math.Abs(user-intr) > 1e-9 {
+		t.Errorf("Profitability must be type-agnostic, got user=%f bad=%f int=%f", user, bad, intr)
+	}
+}
+
 func TestErrAlreadyFilled_Sentinel(t *testing.T) {
 	if ErrAlreadyFilled == nil {
 		t.Fatal("ErrAlreadyFilled should not be nil")
