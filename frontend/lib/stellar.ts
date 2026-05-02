@@ -343,14 +343,19 @@ export async function queryVaultBalance(
       return null;
     }
 
-    // Parse the result — returns (shares: i128, usdc_value: i128)
+    // Parse the result — returns (shares: i128, usdc_value: i128).
+    // scValToNative on a tuple ScVal yields a [bigint, bigint] array.
     if (StellarSdk.rpc.Api.isSimulationSuccess(simulated) && simulated.result) {
-      const retVal = simulated.result.retval;
-      const vec = retVal.value() as unknown as Array<{ value: () => bigint }>;
-      if (vec && vec.length >= 2) {
+      const native = StellarSdk.scValToNative(simulated.result.retval);
+      if (Array.isArray(native) && native.length >= 2) {
+        const toNum = (v: unknown): number => {
+          if (typeof v === "bigint") return Number(v);
+          if (typeof v === "number") return v;
+          return 0;
+        };
         return {
-          shares: Number(vec[0].value()),
-          usdcValue: Number(vec[1].value()),
+          shares: toNum(native[0]),
+          usdcValue: toNum(native[1]),
         };
       }
     }

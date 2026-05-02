@@ -29,11 +29,12 @@ type TxStatus = "idle" | "simulating" | "signing" | "submitted" | "confirmed" | 
 const VAULT_CONTRACT = process.env.NEXT_PUBLIC_VAULT_CONTRACT ?? "";
 const REGISTRY_CONTRACT = process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? "";
 
+// APY is the only value we display before chain data arrives — it's a
+// modelled estimate, not on-chain state. TVL / share count / depositors
+// must come from the chain; never substitute mock values for them, or the
+// UI flashes wrong numbers between disconnect and the first chain read.
 const VAULT_INFO = {
-  tvl: 5117310000000,
   apy: 12.4,
-  totalShares: 5517300000000,
-  depositors: 22,
 };
 
 function walletDisplayName(id: string | undefined): string {
@@ -235,8 +236,8 @@ export default function VaultApp() {
   const connected = wallet?.connected;
 
   // ── Derived UI bits from on-chain state ─────────────────────────────
-  const liveTvl = vaultState?.totalUsdc ?? VAULT_INFO.tvl;
-  const liveTotalShares = vaultState?.totalShares ?? VAULT_INFO.totalShares;
+  const liveTvl = vaultState?.totalUsdc ?? 0;
+  const liveTotalShares = vaultState?.totalShares ?? 0;
   const liveTotalProfit = vaultState?.totalProfit ?? 0;
   const liveActiveLiq = vaultState?.activeLiq ?? 0;
   const livePrice = sharePrice(liveTvl, liveTotalShares);
