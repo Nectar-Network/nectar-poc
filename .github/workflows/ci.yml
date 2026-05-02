@@ -56,6 +56,19 @@ jobs:
         working-directory: keeper
         run: go mod download
 
+      - name: gofmt
+        working-directory: keeper
+        # Fail if any tracked file isn't formatted. -l prints unformatted
+        # filenames to stdout; we want it empty.
+        run: |
+          DIFF=$(gofmt -l .)
+          if [ -n "$DIFF" ]; then
+            echo "::error::gofmt found unformatted files:"
+            echo "$DIFF"
+            echo "Run 'gofmt -w .' from the keeper/ directory and commit."
+            exit 1
+          fi
+
       - name: Build
         working-directory: keeper
         run: go build ./...
