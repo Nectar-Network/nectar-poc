@@ -33,18 +33,18 @@ type SimEntry struct {
 }
 
 type TxResult struct {
-	Status        string `json:"status"`
-	Hash          string
-	ResultXDR     string `json:"resultXdr,omitempty"`
+	Status         string `json:"status"`
+	Hash           string
+	ResultXDR      string `json:"resultXdr,omitempty"`
 	ErrorResultXDR string `json:"errorResultXdr,omitempty"`
 }
 
 type Event struct {
-	Type        string   `json:"type"`
-	ContractID  string   `json:"contractId"`
-	Topic       []string `json:"topic"`
-	Value       string   `json:"value"`
-	Ledger      int64    `json:"ledger"`
+	Type       string   `json:"type"`
+	ContractID string   `json:"contractId"`
+	Topic      []string `json:"topic"`
+	Value      string   `json:"value"`
+	Ledger     int64    `json:"ledger"`
 }
 
 func (c *Client) Simulate(txXDR string) (*SimulateResult, error) {
@@ -111,10 +111,10 @@ func (c *Client) LatestLedger() (int64, error) {
 
 // LedgerEntry is a single getLedgerEntries result entry.
 type LedgerEntry struct {
-	Key                 string `json:"key"`
-	XDR                 string `json:"xdr"`
-	LastModifiedLedger  int64  `json:"lastModifiedLedgerSeq"`
-	LiveUntilLedgerSeq  int64  `json:"liveUntilLedgerSeq,omitempty"`
+	Key                string `json:"key"`
+	XDR                string `json:"xdr"`
+	LastModifiedLedger int64  `json:"lastModifiedLedgerSeq"`
+	LiveUntilLedgerSeq int64  `json:"liveUntilLedgerSeq,omitempty"`
 }
 
 // GetLedgerEntries fetches raw ledger entries for the given base64-XDR keys.
