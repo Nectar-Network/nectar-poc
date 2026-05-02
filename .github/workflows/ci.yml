@@ -79,7 +79,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        # --ignore-scripts skips native gyp builds for transitive deps like
+        # `usb` (pulled in by stellar-wallets-kit's optional Trezor/Ledger
+        # support). Hardware wallets aren't used at build time — they
+        # negotiate USB via WebUSB in the browser at runtime — so we never
+        # actually need the Node-side `usb` binary to compile.
+        run: npm ci --ignore-scripts
 
       - name: Build
         working-directory: frontend
