@@ -119,11 +119,14 @@ pause "step 7"
 
 step "8. Keeper returns 510 (10 USDC profit) — registry.clear_draw + record_execution"
 invoke "$VAULT_CONTRACT" "$KEEPER_SECRET" -- return_proceeds \
-  --keeper "$KEEPER_ADDRESS" --amount 510_0000000
+  --keeper "$KEEPER_ADDRESS" --amount 510_0000000 --response_time_ms 175
 echo "Vault state (total_profit > 0, active_liq = 0):"
 invoke "$VAULT_CONTRACT" "$ADMIN_SECRET" -- get_state
-echo "Keeper info (has_active_draw=FALSE, total_executions=1, total_profit=10_0000000):"
+echo "Keeper info (has_active_draw=FALSE, total_executions=1, total_profit=10_0000000,"
+echo "             response_count=1, total_response_time_ms=175):"
 invoke "$REGISTRY_CONTRACT" "$ADMIN_SECRET" -- get_keeper --operator "$KEEPER_ADDRESS"
+echo "avg_response_time_ms (expect 175):"
+invoke "$REGISTRY_CONTRACT" "$ADMIN_SECRET" -- avg_response_time_ms --operator "$KEEPER_ADDRESS"
 pause "step 8"
 
 step "9. Verify share price increased: depositor's USDC value > 1000"
