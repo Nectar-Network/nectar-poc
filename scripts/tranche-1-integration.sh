@@ -60,8 +60,8 @@ pause "step 0"
 step "1. Mint USDC to depositor + keeper"
 # Assumes USDC SAC where ADMIN is the asset issuer. If you're using Circle
 # USDC on testnet you'll need a faucet or transfer instead.
-invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- mint --to "$DEPOSITOR_ADDRESS" --amount 10000_0000000
-invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- mint --to "$KEEPER_ADDRESS"    --amount 1000_0000000
+invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- mint --to "$DEPOSITOR_ADDRESS" --amount 1000000000000
+invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- mint --to "$KEEPER_ADDRESS"    --amount 100000000000
 echo "Depositor balance:"
 invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- balance --id "$DEPOSITOR_ADDRESS"
 echo "Keeper balance:"
@@ -69,8 +69,14 @@ invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- balance --id "$KEEPER_ADDRESS"
 pause "step 1"
 
 step "2. Register keeper (transfers stake to registry)"
-invoke "$REGISTRY_CONTRACT" "$KEEPER_SECRET" -- register \
-  --operator "$KEEPER_ADDRESS" --name "keeper-demo"
+# Idempotent — testnet-setup.sh already registered both keepers, so this is
+# a no-op on a fresh-bootstrap run. We probe get_keeper first.
+if invoke "$REGISTRY_CONTRACT" "$ADMIN_SECRET" -- get_keeper --operator "$KEEPER_ADDRESS" >/dev/null 2>&1; then
+  echo "  already registered — skipping register call."
+else
+  invoke "$REGISTRY_CONTRACT" "$KEEPER_SECRET" -- register \
+    --operator "$KEEPER_ADDRESS" --name "keeper-demo"
+fi
 echo "Keeper info:"
 invoke "$REGISTRY_CONTRACT" "$ADMIN_SECRET" -- get_keeper --operator "$KEEPER_ADDRESS"
 echo "Keeper USDC after stake (should drop by min_stake):"
@@ -79,7 +85,7 @@ pause "step 2"
 
 step "3. Depositor deposits 1000 USDC"
 invoke "$VAULT_CONTRACT" "$DEPOSITOR_SECRET" -- deposit \
-  --user "$DEPOSITOR_ADDRESS" --amount 1000_0000000
+  --user "$DEPOSITOR_ADDRESS" --amount 100000000000
 echo "Vault state:"
 invoke "$VAULT_CONTRACT" "$ADMIN_SECRET" -- get_state
 echo "Depositor record (note last_deposit_time — cooldown anchor):"
@@ -89,7 +95,7 @@ pause "step 3"
 step "4. Withdraw before cooldown — must fail with WithdrawalCooldown (#9)"
 set +e
 invoke "$VAULT_CONTRACT" "$DEPOSITOR_SECRET" -- withdraw \
-  --user "$DEPOSITOR_ADDRESS" --shares 100_0000000
+  --user "$DEPOSITOR_ADDRESS" --shares 10000000000
 set -e
 echo "↑ if WithdrawalCooldown shown, the cooldown gate is working."
 pause "step 4"
@@ -97,13 +103,13 @@ pause "step 4"
 step "5. Over-cap deposit attempt — must fail with DepositCapExceeded (#8)"
 set +e
 invoke "$VAULT_CONTRACT" "$DEPOSITOR_SECRET" -- deposit \
-  --user "$DEPOSITOR_ADDRESS" --amount 99999999_0000000  # huge
+  --user "$DEPOSITOR_ADDRESS" --amount 9999999900000000  # huge
 set -e
 pause "step 5"
 
 step "6. Keeper draws \$500 — vault calls registry.mark_draw"
 invoke "$VAULT_CONTRACT" "$KEEPER_SECRET" -- draw \
-  --keeper "$KEEPER_ADDRESS" --amount 500_0000000
+  --keeper "$KEEPER_ADDRESS" --amount 50000000000
 echo "Vault state (active_liq should be 500_0000000):"
 invoke "$VAULT_CONTRACT" "$ADMIN_SECRET" -- get_state
 echo "Keeper info (has_active_draw should be TRUE):"
@@ -113,13 +119,13 @@ pause "step 6"
 step "7. Over-limit draw — must fail with DrawLimitExceeded (#10)"
 set +e
 invoke "$VAULT_CONTRACT" "$KEEPER_SECRET" -- draw \
-  --keeper "$KEEPER_ADDRESS" --amount 999999_0000000
+  --keeper "$KEEPER_ADDRESS" --amount 99999900000000
 set -e
 pause "step 7"
 
 step "8. Keeper returns 510 (10 USDC profit) — registry.clear_draw + record_execution"
 invoke "$VAULT_CONTRACT" "$KEEPER_SECRET" -- return_proceeds \
-  --keeper "$KEEPER_ADDRESS" --amount 510_0000000 --response_time_ms 175
+  --keeper "$KEEPER_ADDRESS" --amount 51000000000 --response_time_ms 175
 echo "Vault state (total_profit > 0, active_liq = 0):"
 invoke "$VAULT_CONTRACT" "$ADMIN_SECRET" -- get_state
 echo "Keeper info (has_active_draw=FALSE, total_executions=1, total_profit=10_0000000,"
@@ -140,7 +146,7 @@ echo "Sleeping ${WITHDRAW_COOLDOWN:-3600}s for the cooldown window."
 echo "(Skip with: WITHDRAW_COOLDOWN=0 in deploy.sh, or kill + manually wait.)"
 sleep "${WITHDRAW_COOLDOWN_SLEEP:-${WITHDRAW_COOLDOWN:-3600}}"
 invoke "$VAULT_CONTRACT" "$DEPOSITOR_SECRET" -- withdraw \
-  --user "$DEPOSITOR_ADDRESS" --shares 1000_0000000
+  --user "$DEPOSITOR_ADDRESS" --shares 100000000000
 echo "Final depositor USDC balance (should be original + 10 profit):"
 invoke "$USDC_CONTRACT" "$ADMIN_SECRET" -- balance --id "$DEPOSITOR_ADDRESS"
 

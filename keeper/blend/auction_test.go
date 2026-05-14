@@ -172,7 +172,7 @@ func TestBidValueUSD_ScalesWithBid(t *testing.T) {
 func TestAuctionType_RequestType(t *testing.T) {
 	cases := []struct {
 		kind AuctionType
-		want uint64
+		want uint32
 	}{
 		{AuctionUserLiquidation, 6},
 		{AuctionBadDebt, 7},
@@ -247,6 +247,26 @@ func TestErrAlreadyFilled_Sentinel(t *testing.T) {
 	}
 	if ErrAlreadyFilled.Error() == "" {
 		t.Fatal("ErrAlreadyFilled should have a non-empty message")
+	}
+}
+
+// TestSubmitPayload_BlendABITypes locks in the on-chain scalar types of the
+// submit() request map. Blend's #[contracttype] Request struct is:
+//
+//	{ request_type: u32, address: Address, amount: i128 }
+//
+// LiquidationLab accepts any Val map (no type check), so a regression to
+// ScvU64 for these fields would still pass an E2E against the lab but fail
+// against a real Blend pool. This guards against that.
+func TestSubmitPayload_BlendABITypes(t *testing.T) {
+	rt := AuctionUserLiquidation.requestType()
+	rtVal := soroban.ScvU32(rt)
+	if rtVal.Type.String() != "ScValTypeScvU32" {
+		t.Fatalf("request_type must encode as ScvU32, got %s", rtVal.Type.String())
+	}
+	amtVal := soroban.ScvI128(0)
+	if amtVal.Type.String() != "ScValTypeScvI128" {
+		t.Fatalf("amount must encode as ScvI128, got %s", amtVal.Type.String())
 	}
 }
 
