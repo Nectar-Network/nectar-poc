@@ -189,8 +189,8 @@ func ScvI128(n int64) xdr.ScVal {
 	}
 	lo := xdr.Uint64(uint64(n))
 	return xdr.ScVal{
-		Type:  xdr.ScValTypeScvI128,
-		I128:  &xdr.Int128Parts{Hi: hi, Lo: lo},
+		Type: xdr.ScValTypeScvI128,
+		I128: &xdr.Int128Parts{Hi: hi, Lo: lo},
 	}
 }
 

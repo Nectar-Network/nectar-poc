@@ -15,13 +15,13 @@ type PoolState struct {
 }
 
 type Reserve struct {
-	Asset           string
-	Index           uint32
+	Asset            string
+	Index            uint32
 	CollateralFactor float64
 	LiabilityFactor  float64
-	BRate           float64 // scaled 1e7
-	DRate           float64 // scaled 1e7
-	OraclePrice     float64
+	BRate            float64 // scaled 1e7
+	DRate            float64 // scaled 1e7
+	OraclePrice      float64
 }
 
 const scalar = 1e7
@@ -72,12 +72,12 @@ func LoadPool(rpc *soroban.Client, passphrase, poolAddr string) (*PoolState, err
 
 func parseReserve(val xdr.ScVal, asset string) *Reserve {
 	res := &Reserve{
-		Asset:           asset,
+		Asset:            asset,
 		CollateralFactor: 0.75,
 		LiabilityFactor:  1.1,
-		BRate:           scalar,
-		DRate:           scalar,
-		OraclePrice:     0.30,
+		BRate:            scalar,
+		DRate:            scalar,
+		OraclePrice:      0.30,
 	}
 	if val.Type != xdr.ScValTypeScvMap || val.Map == nil || *val.Map == nil {
 		return res

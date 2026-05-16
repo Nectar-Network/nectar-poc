@@ -6,7 +6,9 @@ import {
   fetchPerformance,
   formatUSDC,
   shortAddress,
+  successRate,
 } from "../../lib/api";
+import { queryKeeper } from "../../lib/stellar";
 
 interface Props {
   initialData: PerformanceData | null;
@@ -57,18 +59,35 @@ const TESTNET_VAULT = {
   active_liq: 0,
 };
 
-const TESTNET_KEEPER_STATS: Record<string, { name: string; address: string; liquidations: number; total_profit: number }> = {
+const TESTNET_KEEPER_STATS: Record<string, {
+  name: string;
+  address: string;
+  liquidations: number;
+  total_profit: number;
+  stake?: number;
+  total_executions?: number;
+  successful_fills?: number;
+  has_active_draw?: boolean;
+}> = {
   "keeper-alpha": {
     name: "keeper-alpha",
     address: "GCR36Y5AHRAMJGHJLA4EFORJKR3E4D4QVIMPFM26MWAP77DAQ463ZTGZ",
     liquidations: 8,
     total_profit: 135000000000, // $13,500 from alpha
+    stake: 1000_0000000,         // 100 USDC stake
+    total_executions: 9,
+    successful_fills: 8,
+    has_active_draw: false,
   },
   "keeper-beta": {
     name: "keeper-beta",
     address: "GBOE5QCNDXNSVSEMU3GJ3INAJITX44UOK5D5YXRIX523DYBSTPCS546F",
     liquidations: 6,
     total_profit: 110000000000, // $11,000 from beta
+    stake: 1000_0000000,
+    total_executions: 7,
+    successful_fills: 6,
+    has_active_draw: false,
   },
 };
 
@@ -101,6 +120,11 @@ export default function PerformanceDashboard({ initialData }: Props) {
   const [data, setData] = useState<PerformanceData | null>(initialData);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [live, setLive] = useState(!!initialData);
+  // On-chain keeper data (stake, executions, has_active_draw) read directly
+  // from KeeperRegistry — overrides whatever the keeper API reports.
+  const [chainKeepers, setChainKeepers] = useState<
+    Record<string, { stake: number; total_executions: number; successful_fills: number; has_active_draw: boolean; total_profit: number }>
+  >({});
   const hasLiveData = data && data.depositors && data.depositors.length > 0;
   // Merge live data with fallback keeper stats (keeper-beta runs on a separate server)
   const display = hasLiveData
@@ -126,6 +150,39 @@ export default function PerformanceDashboard({ initialData }: Props) {
     const timer = setInterval(poll, 15_000);
     return () => clearInterval(timer);
   }, []);
+
+  // Pull authoritative keeper info from the registry contract directly.
+  useEffect(() => {
+    let cancelled = false;
+    const refreshChain = async () => {
+      const keeperAddrs = Object.values(display.keeper_stats ?? {})
+        .map((k) => k.address)
+        .filter(Boolean);
+      if (!keeperAddrs.length) return;
+      const results = await Promise.all(keeperAddrs.map((a) => queryKeeper(a)));
+      if (cancelled) return;
+      const next: Record<string, { stake: number; total_executions: number; successful_fills: number; has_active_draw: boolean; total_profit: number }> = {};
+      results.forEach((r, i) => {
+        if (r) {
+          next[keeperAddrs[i]] = {
+            stake: r.stake,
+            total_executions: r.totalExecutions,
+            successful_fills: r.successfulFills,
+            has_active_draw: r.hasActiveDraw,
+            total_profit: r.totalProfit,
+          };
+        }
+      });
+      if (Object.keys(next).length > 0) setChainKeepers(next);
+    };
+    refreshChain();
+    const t = setInterval(refreshChain, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [display.keeper_stats]);
 
   const vault = display.vault;
   const depositors = display.depositors ?? [];
@@ -318,31 +375,74 @@ export default function PerformanceDashboard({ initialData }: Props) {
               <tr style={{ background: "rgba(255,255,255,0.03)" }}>
                 <th style={{ ...headerCell, textAlign: "left" }}>Name</th>
                 <th style={{ ...headerCell, textAlign: "left" }}>Address</th>
-                <th style={{ ...headerCell, textAlign: "right" }}>Liquidations</th>
-                <th style={{ ...headerCell, textAlign: "right" }}>Total Profit</th>
+                <th style={{ ...headerCell, textAlign: "right" }}>Stake</th>
+                <th style={{ ...headerCell, textAlign: "right" }}>Executions</th>
+                <th style={{ ...headerCell, textAlign: "right" }}>Success</th>
+                <th style={{ ...headerCell, textAlign: "right" }}>Profit</th>
+                <th style={{ ...headerCell, textAlign: "center" }}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(keeperStats).map(([, ks]) => (
-                <tr key={ks.address}>
-                  <td style={cell}>
-                    <span style={{ color: "var(--accent)" }}>{ks.name}</span>
-                  </td>
-                  <td style={cell}>
-                    <span title={ks.address}>{shortAddress(ks.address)}</span>
-                  </td>
-                  <td style={{ ...cell, textAlign: "right" }}>{ks.liquidations}</td>
-                  <td
-                    style={{
-                      ...cell,
-                      textAlign: "right",
-                      color: ks.total_profit > 0 ? "var(--accent)" : "var(--text)",
-                    }}
-                  >
-                    ${formatUSDC(ks.total_profit)}
-                  </td>
-                </tr>
-              ))}
+              {Object.entries(keeperStats).map(([, ks]) => {
+                const chain = chainKeepers[ks.address];
+                const stake = chain?.stake ?? ks.stake ?? 0;
+                const exec = chain?.total_executions ?? ks.total_executions ?? ks.liquidations;
+                const fills = chain?.successful_fills ?? ks.successful_fills ?? ks.liquidations;
+                const profit = chain?.total_profit ?? ks.total_profit;
+                const active = chain?.has_active_draw ?? ks.has_active_draw ?? false;
+                const rate = successRate(exec, fills);
+                return (
+                  <tr key={ks.address}>
+                    <td style={cell}>
+                      <span style={{ color: "var(--accent)" }}>{ks.name}</span>
+                    </td>
+                    <td style={cell}>
+                      <span title={ks.address}>{shortAddress(ks.address)}</span>
+                    </td>
+                    <td style={{ ...cell, textAlign: "right" }}>
+                      {stake > 0 ? `$${formatUSDC(stake)}` : "—"}
+                    </td>
+                    <td style={{ ...cell, textAlign: "right" }}>
+                      {fills}/{exec}
+                    </td>
+                    <td
+                      style={{
+                        ...cell,
+                        textAlign: "right",
+                        color: rate >= 0.9 ? "var(--accent)" : rate >= 0.5 ? "var(--text)" : "var(--amber)",
+                      }}
+                    >
+                      {(rate * 100).toFixed(1)}%
+                    </td>
+                    <td
+                      style={{
+                        ...cell,
+                        textAlign: "right",
+                        color: profit > 0 ? "var(--accent)" : "var(--text)",
+                      }}
+                    >
+                      ${formatUSDC(profit)}
+                    </td>
+                    <td style={{ ...cell, textAlign: "center" }}>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          fontSize: "10px",
+                          fontFamily: "monospace",
+                          background: active
+                            ? "rgba(230, 172, 47, 0.12)"
+                            : "rgba(0, 229, 160, 0.08)",
+                          color: active ? "var(--amber)" : "var(--accent)",
+                          border: `1px solid ${active ? "var(--amber)" : "var(--accent)"}`,
+                        }}
+                      >
+                        {active ? "ACTIVE DRAW" : "IDLE"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
