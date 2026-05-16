@@ -75,8 +75,10 @@ Tranche 1 redeploy on 2026-05-13 — these contracts ship the staking + slashing
 
 The Blend pool ID comes from [blend-utils/testnet.contracts.json](https://github.com/blend-capital/blend-utils/blob/main/testnet.contracts.json) (key: `TestnetV2`). Point the keeper at it with `./scripts/keeper-blend-testnet.sh` — no code changes needed.
 
-### Testnet Stats (post Tranche 1 redeploy)
+### Testnet Stats (live, post Tranche 1 redeploy)
 
+- **TVL**: 50,020 USDC across 15+ depositors
+- **Realized profit on-chain**: 100 USDC from one full draw→fill→return cycle (`response_time_ms: 175`)
 - **Keepers**: 2 registered operators (alpha + beta), each staked 100 USDC on-chain
 - **Vault config**: deposit cap 10M USDC, withdraw cooldown 30s (demo), max draw 10k USDC/keeper
 - **Registry config**: 100 USDC min stake, slash timeout 3600s, slash rate 10% bps
