@@ -24,11 +24,12 @@ const maxSSEClients = 100
 
 // LiquidationRecord is appended on every successful auction fill.
 type LiquidationRecord struct {
-	User      string    `json:"user"`
-	Block     int64     `json:"block"`
-	Drew      int64     `json:"drew"`
-	Proceeds  int64     `json:"proceeds"`
-	Timestamp time.Time `json:"ts"`
+	User           string    `json:"user"`
+	Block          int64     `json:"block"`
+	Drew           int64     `json:"drew"`
+	Proceeds       int64     `json:"proceeds"`
+	ResponseTimeMs int64     `json:"response_time_ms"`
+	Timestamp      time.Time `json:"ts"`
 }
 
 // KeeperStat tracks per-keeper performance metrics.
@@ -323,11 +324,12 @@ func handleLiquidation(rpc *soroban.Client, kp *keypair.Full, cfg Config, pool *
 		}
 		state.mu.Lock()
 		state.Liquidations = append(state.Liquidations, LiquidationRecord{
-			User:      user,
-			Block:     currentLedger,
-			Drew:      bidAmt,
-			Proceeds:  proceeds,
-			Timestamp: time.Now().UTC(),
+			User:           user,
+			Block:          currentLedger,
+			Drew:           bidAmt,
+			Proceeds:       proceeds,
+			ResponseTimeMs: responseMs,
+			Timestamp:      time.Now().UTC(),
 		})
 		if ks := state.KeeperStats[cfg.KeeperName]; ks != nil {
 			ks.Liquidations++

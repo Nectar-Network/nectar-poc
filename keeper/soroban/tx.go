@@ -175,6 +175,12 @@ func ScvAddress(addr string) (xdr.ScVal, error) {
 	return xdr.ScVal{Type: xdr.ScValTypeScvAddress, Address: &scAddr}, nil
 }
 
+// ScvU32 wraps a uint32 as ScVal. Blend's Request.request_type is u32.
+func ScvU32(n uint32) xdr.ScVal {
+	v := xdr.Uint32(n)
+	return xdr.ScVal{Type: xdr.ScValTypeScvU32, U32: &v}
+}
+
 // ScvU64 wraps a uint64 as ScVal.
 func ScvU64(n uint64) xdr.ScVal {
 	v := xdr.Uint64(n)

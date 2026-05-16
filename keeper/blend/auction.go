@@ -34,8 +34,8 @@ var AllAuctionTypes = []AuctionType{
 }
 
 // requestTypeFor returns the Blend submit() request_type that fills the given
-// auction kind.
-func (t AuctionType) requestType() uint64 {
+// auction kind. Blend's Request.request_type is u32 on-chain.
+func (t AuctionType) requestType() uint32 {
 	switch t {
 	case AuctionUserLiquidation:
 		return 6
@@ -162,8 +162,11 @@ func fillAuctionRequest(rpc *soroban.Client, horizonURL string, kp *keypair.Full
 		return err
 	}
 
-	reqTypeVal := soroban.ScvU64(kind.requestType())
-	zeroAmt := soroban.ScvU64(0)
+	// Blend's Request struct: request_type:u32, address:Address, amount:i128.
+	// Wrong scalar types make the pool reject the submit even when the keys
+	// look right — see contracts/blend Request derive.
+	reqTypeVal := soroban.ScvU32(kind.requestType())
+	zeroAmt := soroban.ScvI128(0)
 
 	// Keys MUST be in sorted lexicographic order for Soroban Map<Symbol, Val>.
 	reqMap := xdr.ScMap{
