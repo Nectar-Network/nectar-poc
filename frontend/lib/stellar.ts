@@ -7,12 +7,16 @@ const HORIZON_TESTNET = "https://horizon-testnet.stellar.org";
 // Contract addresses — set via env. USDC_CONTRACT must be the mock-USDC SAC
 // the vault was initialized with (registry.get_config().usdc_token), NOT the
 // classic-asset Circle USDC trustline a user might happen to hold.
+//
+// `.trim()` because `echo "$value" | vercel env add` smuggles a trailing
+// newline; that bumps the strkey length to 57 and decodeContract rejects it
+// with "Invalid contract ID: …". Belt-and-suspenders against env hygiene.
 const VAULT_CONTRACT =
-  process.env.NEXT_PUBLIC_VAULT_CONTRACT ?? "";
+  (process.env.NEXT_PUBLIC_VAULT_CONTRACT ?? "").trim();
 const REGISTRY_CONTRACT =
-  process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? "";
+  (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? "").trim();
 const USDC_CONTRACT =
-  process.env.NEXT_PUBLIC_USDC_CONTRACT ?? "";
+  (process.env.NEXT_PUBLIC_USDC_CONTRACT ?? "").trim();
 
 const STORAGE_SELECTED_WALLET = "nectar.selectedWalletId";
 
